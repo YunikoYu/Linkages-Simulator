@@ -1,0 +1,59 @@
+angular velocity 
+\frac{d}{dt}[r_3e^{i\theta_3} - r_4e^{i\theta4}]
+=\frac{d}{dt}[r_1e^{i\theta_1} - r_2e^{i\theta2}]
+
+\dot{r_3}e^{i\theta_3}
++i\omega_3r_3e^{i\theta_3} 
+- (r_4e^{i\theta4}
++i\omega_4r_4e^{i\theta_4})
+=\dot{r_1}e^{i\theta_1}
++i\omega_1r_1e^{i\theta_1} 
+- (\dot{r_2}e^{i\theta2}
++i\omega_2r_2e^{i\theta_2})
+
+slider velocity
+\frac{d}{dt}[r_1e^{i\theta_1} + r_7e^{i\theta4}]
+=\frac{d}{dt}[r_6e^{i\theta_6} - r_5e^{i\theta5}]
+
+i\omega_4r_7e^{i\theta_4} = v_6e^{i\theta_6}
++i\omega_6r_6e^{i\theta_6}
+-i\omega_5r_5e^{i\theta_5}
+
+\omega_5 = \frac{-\omega_4r_7e^{4}}{r_5e^{i\theta_5}}
+
+\omega_5 = \frac{-\omega_4r_7\cos(\theta_4)}{r_5\cos(\theta_5)}
+
+angular acceleration
+i\dot{\omega_3}r_3e^{i\theta_3}
++i\omega_3\dot{r_3}e^{i\theta_3}
++i^2i\omega_3r_3e^{i\theta_3} 
+- i\dot{\omega_4}r_4e^{i\theta_4} 
+-  i\omega_4\dot{r_4}e^{i\theta_4}
+-  i^2\omega_4r_4e^{i\theta_4} 
+= - i\dot{\omega_2}r_2e^{i\theta_2} 
+-  i\omega_2\dot{r_2}e^{i\theta_2}
+-  i^2\omega_2r_2e^{i\theta_2}
+
+i\alpha_3r_3e^{i\theta_3}
+-\omega_3^2r_3e^{i\theta_3} 
+- i\alpha_4r_4e^{i\theta_4} 
++  \omega_4^2r_4e^{i\theta_4} 
+= \omega_2^2r_2e^{i\theta_2}
+
+\alpha_3 
+= \frac{r_2\omega_2^2\cos(\theta_4 - \theta_2)
++ r_3\omega_3^2\cos(\theta_4 - \theta_3)
+-r_4\omega_4^2}{r_3\sin(\theta_4 - \theta_3)}
+
+\alpha_4 
+= \frac{-r_2\omega_2^2\cos(\theta_3 - \theta_2)
++ r_4\omega_4^2\cos(\theta_3 - \theta_4)
+-r_3\omega_3^2}{r_4\sin(\theta_3 - \theta_4)}
+
+
+slider acceleration 
+\frac{d}{dt}[v_6] = a_6 =
+i\alpha_4r_7e^{i\theta_4}
+-\omega_4^2r_7e^{i\theta_4} 
++ i\alpha_5r_5e^{i\theta_5} 
+- \omega_5^2r_5e^{i\theta_5}

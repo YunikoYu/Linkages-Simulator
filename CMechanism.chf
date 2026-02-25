@@ -1,0 +1,653 @@
+/**************************************************
+* File: CMechanism.chf
+* Includes member functions of class CMechanism
+**************************************************/
+#include <mechanism.h>
+
+void CMechanism::m_initialize() {
+    /* default parameters */
+    m_r[1] = 6.0;                   // length of link 1 in m
+    m_r[2] = 1.0;                   // length of link 2 in m
+    m_r[3] = 3.0;                   // length of link 3 in m
+    m_r[4] = 5.0;                   // length of link 4 in m
+    m_r[5] = 4.0;                   // length of link 5 in m
+    m_rc = 1.0;                     // length of link BC in m
+    m_r[7] = m_r[4] - m_rc;         // length of link CB0 in m    
+    m_rp = 2.5;                     // length of coupler AP in m
+    m_beta = 20*M_PI/180;           // angle between PA and AB
+    
+    m_theta[1] = -30*M_PI/180;      // angle of link 1
+    m_theta[2] = 45*M_PI/180;       // angle of input link 2
+    m_theta[6] = 0;                 // angle of link 6
+    
+    m_omega[2] = 15;                // input angular velocity in rad/sec
+    m_numpoints = 50;               
+    
+    m_mass[2] = 0.8;                // kg
+    m_mass[3] = 2.4;                
+    m_mass[4] = 1.4;                
+    m_mass[5] = 2.0;                
+    m_mass[6] = 0.3;                
+    
+    m_inertia[2] = 0.012;           // kg*m^2
+    m_inertia[3] = 0.119;           
+    m_inertia[4] = 0.038;           
+    m_inertia[5] = 0.040;           
+    m_inertia[6] = 0.0;             
+    
+    m_rg[2] = 1.25;                 // m
+    m_rg[3] = 2.75;                 
+    m_rg[4] = 2.5;                  
+    m_rg[5] = 3.0;                  
+    m_rg[6] = 0.0;                  
+    
+    m_delta[2] = 30*M_PI/180;       // radians
+    m_delta[3] = 15*M_PI/180;
+    m_delta[4] = 30*M_PI/180;
+    m_delta[4] = 0;
+    m_delta[5] = 0;
+    
+    m_uscunit = 0;                  // selection SI units
+}
+
+/********************************************
+* Constructor of class CMechanism
+********************************************/
+CMechanism::CMechanism() {
+    m_initialize();
+}
+
+/********************************************
+* Destructor of class CMechanism
+********************************************/
+CMechanism::~CMechanism()
+{}
+
+/*********************************************************
+* Member Function: uscUnit()
+* Purpose: Specify the use of SI or US Customary units.
+* Arguments: unit   --- true is USC units
+*                   --- false is SI units
+*********************************************************/
+void CMechanism::uscUnit(bool unit) {
+    m_uscunit = unit;
+    if(m_uscunit)
+        printf("\n** Analysis done in English Units **\n\n");
+    else
+        printf("\n** Analysis done in SI Units **\n\n");
+}
+
+/**************************************************************
+* Member Function: setLinks()
+* Purpose: Set the length for each link and angle.
+* Arguments:      rc --- length link BC
+*               r[1] ---   "      "  1
+*               r[2] ---   "      "  2
+*               r[3] ---   "      "  3
+*               r[4] ---   "      "  4
+*               r[5] ---   "      "  5
+*               theta 1 --- angle of link 1
+**************************************************************/
+void CMechanism::setLinks(double rc, r1, r2, r3, r4, r5, theta1){
+    //int characteristic;
+    // Check geometry input for values that won't work with the mechanism
+    //
+    // Assign parameters for valid geometry
+    m_rc = rc;
+    m_r[1] = r1;
+    m_r[2] = r2;
+    m_r[3] = r3;
+    m_r[4] = r4; 
+    m_r[5] = r5;
+    m_theta[1] = theta1;
+    
+    // Convert ft to m 
+    if(m_uscunit) {
+        m_rc *= M_FT2M;
+        m_r[1] *= M_FT2M;
+        m_r[2] *= M_FT2M;
+        m_r[3] *= M_FT2M;
+        m_r[4] *= M_FT2M;
+        m_r[5] *= M_FT2M;
+    }
+    
+    m_r[7] = m_r[4] - m_rc; 
+}
+
+/*********************************************************************************************
+* Member Function: setCouplerPoint()
+* Purpose: Set parameters for the coupler point.
+* Arguments:   rp --- double number for rp
+*            beta --- double number for beta
+*********************************************************************************************/
+void CMechanism::setCouplerPoint(double rp, beta) {
+    m_rp = rp;
+    m_beta = beta;
+
+    if(m_uscunit) 
+      m_rp *= M_FT2M;     // ft to m           
+}
+
+/****************************************************************************************
+* Member Function: position()
+* Purpose: Calculate the unknown theta3 and theta4 for a given theta2.
+* Arguments: theta_1 --- double array with dimension size of 6 for the first solution.
+*            theta_2 --- double array with dimension size of 6 for the second solution.
+****************************************************************************************/
+void CMechanism::position(double theta_1[1:], theta_2[1:]) {
+    double complex z1;
+    theta_2[2] = theta_1[2];
+    
+    // Calculate the solutions of theta3 and theta4 for circuit 1 and 2
+    z1 = polar(m_r[1], theta_1[1]) - polar(m_r[2], theta_1[2]);
+    complexsolve(2, 4, m_r[3], -m_r[4], z1, theta_1[3], theta_1[4], theta_2[3], theta_2[4]);
+    m_theta[3] = theta_1[3];
+    m_theta[4] = theta_1[4];
+}
+
+/*****************************************************************************************************
+* Member Function: velocity()
+* Purpose: Calculate the angular velocity of other links given the angular velocity of one link
+* Arguments: theta --- double array with dimension size of 6 used for the angles of links
+*            omega --- double array with dimension size of 6 used for the angular velocities of links
+*****************************************************************************************************/
+void CMechanism::velocity(double theta[1:], omega[1:]) {
+    // return omega3
+    omega[3] = -(m_r[2]/m_r[3])*(sin(theta[2]-theta[4])/sin(theta[3]-theta[4]))*omega[2];
+    // return omega4 
+    omega[4] = (m_r[2]/m_r[4])*(sin(theta[2]-theta[3])/sin(theta[4]-theta[3]))*omega[2];
+}
+
+/************************************************************************************************
+* Member Function: acceleration()
+* Purpose: Given the angular acceleration of link 2, calculate the angular acceleration of 
+*          links 3 and links 4
+* Arguments: theta --- An array of double data type with angles of links
+*            omega --- An array of double data type with angular velocities of links
+*            alpha --- An array of double data type with angular accelerations of links
+************************************************************************************************/
+void CMechanism::acceleration(double theta[1:], omega[1:], alpha[1:]) 
+{
+    double a,b,c,d,e;
+    
+    a = -m_r[2]*alpha[2]*sin(theta[4]-theta[2]);
+    b = m_r[2]*omega[2]*omega[2]*cos(theta[4]-theta[2]);
+    c = m_r[3]*omega[3]*omega[3]*cos(theta[4]-theta[3]);
+    d = -m_r[4]*omega[4]*omega[4];
+    e = m_r[3]*sin(theta[4]-theta[3]);
+    alpha[3] = (a+b+c+d)/e;
+
+    a = m_r[2]*alpha[2]*sin(theta[3]-theta[2]);
+    b = -m_r[2]*omega[2]*omega[2]*cos(theta[3]-theta[2]);
+    c = m_r[4]*omega[4]*omega[4]*cos(theta[3]-theta[4]);
+    d = -m_r[3]*omega[3]*omega[3];
+    e = m_r[4]*sin(theta[3]-theta[4]);
+    alpha[4] = (a+b+c+d)/e;  
+}
+
+/*********************************************************************************************
+* Member Function: couplerPos()
+* Purpose: Calculate the position of the coupler point.
+* Arguments: theta2 --- double number used for angle of link 2
+*                p1 --- output of double complex used for the first solution of coupler point P
+*                p2 --- output of double complex used for the second solution of coupler point P
+*********************************************************************************************/
+void CMechanism::couplerPos(double Theta2, double complex &p1, &p2) {
+    double complex z;
+    double x1, x2, x3, x4;
+    double Theta3, Theta4;
+    
+    z = polar(m_r[1], m_theta[1]) - polar(m_r[2], Theta2);   // z = r1-r2
+    complexsolve(2, 4, m_r[3], -m_r[4], z, x1, x2, x3, x4);
+    // first set of solutions
+    Theta3 = x1;  Theta4 = x2;
+    p1 = polar(m_r[2], Theta2) + polar(m_rp, Theta3+m_beta); // P = r2+rp 
+    // second set of solutions
+    Theta3 = x3; Theta4 = x4; 
+    p2 = polar(m_r[2], Theta2) + polar(m_rp, Theta3+m_beta); // P = r2+rp
+    
+    if(m_uscunit) { 
+      p1 /= M_FT2M;     // m to ft              
+      p2 /= M_FT2M;     // m to ft 
+    }
+}
+
+/****************************************************************************************
+* Member Function: sliderPos()
+* Purpose: Calculate the unknown theta5 and length r6 for a given theta2.
+* Arguments: theta_1 --- double array with dimension size of 6 for the first solution.
+*            theta_2 --- double array with dimension size of 6 for the second solution.
+*                 r6 --- double array with dimension size of 4 for four solutions.
+*             theta5 --- double array with dimension size of 4 for four solutions.
+****************************************************************************************/
+void CMechanism::sliderPos(double theta_1[1:], theta_2[1:], r6[1:], theta5[1:]) {
+    double complex z2, z3;
+    // Calculate the solutions of theta5 and r6 for circuit 1 and 3
+    z2 = polar(m_r[1], theta_1[1]) + polar(m_r[7], theta_1[4]);
+    complexsolve(1, 4, m_theta[6], -m_r[5], z2, r6[1], theta5[1], r6[3], theta5[3]);
+    // Calculate the solutions of theta5 and r6 for circuit 2 and 4
+    z3 = polar(m_r[1], theta_2[1]) + polar(m_r[7], theta_2[4]);
+    complexsolve(1, 4, m_theta[6], -m_r[5], z3, r6[2], theta5[2], r6[4], theta5[4]);
+}
+
+/*****************************************************************************************************
+* Member Function: sliderVel()
+* Purpose: Calculate the angular and linear velocity of the slider link.
+* Arguments: theta --- double array with dimension size of 6 used for the angles of links
+*            omega --- double array with dimension size of 6 used for the angular velocities of links
+*             v6_x --- double number used for the x component of slider velocity
+*             v6_y --- double number used for the y component of slider velocity
+*               v6 --- double number used for the absolute magnitude of slider velocity
+*****************************************************************************************************/
+void CMechanism::sliderVel(double theta[1:], omega[1:], &v6_x, &v6_y, &v6) 
+{
+    // return omega5
+    omega[5] = -(m_r[2]/m_r[7])*(cos(theta[4])/cos(theta[5]))*omega[4];
+    // return x component of v6
+    v6_x = omega[4]*sin(theta[4]) + omega[5]*sin(theta[5]);
+    // return x component of v6
+    v6_y = omega[4]*cos(theta[4]) + omega[5]*cos(theta[5]);
+    // return the absolute magnitude of v6
+    v6 = real(omega[4]*m_r[7]*sin(theta[4]) + omega[5]*m_r[5]*sin(theta[5]));
+}
+
+/************************************************************************************************
+* Member Function: sliderAccel()
+* Purpose: Given the angular acceleration of link 2, calculate the angular acceleration of 
+*          links 3 and links 4
+* Arguments:  theta --- An array of double data type with angles of links
+*             omega --- An array of double data type with angular velocities of links
+*             alpha --- An array of double data type with angular accelerations of links
+*                a6 --- real part of the acceleration of the slider
+************************************************************************************************/
+void CMechanism::sliderAccel(double theta[1:], omega[1:], alpha[1:], &a6)
+{
+    double a,b,c,d,e;
+    complex double f,g,h,i;
+    
+    a = omega[4]*omega[4]*m_r[7]*sin(theta[4]);
+    b = omega[5]*omega[5]*m_r[5]*sin(theta[5]);
+    c = -alpha[4]*m_r[7]*cos(theta[4]);
+    d = m_r[5]*cos(theta[5]);
+    alpha[5] = (a+b+c)/d;
+    
+    //~ a = -omega[4]*omega[4]*m_r[7]*cos(theta[4]);
+    //~ b = -omega[5]*omega[5]*m_r[5]*cos(theta[5]);
+    //~ c = -alpha[4]*m_r[7]*sin(theta[4]);
+    //~ d = -alpha[5]*m_r[5]*sin(theta[5]);
+    //~ a6 = a+b+c+d;
+    
+    f = I*polar(alpha[4]*m_r[7], theta[4]);
+    g = I*polar(alpha[5]*m_r[5], theta[5]);
+    h = -polar(omega[4]*omega[4]*m_r[7], theta[4]);
+    e = -polar(omega[5]*omega[5]*m_r[5], theta[5]);
+    
+    a6 = real(f+g+h+i);
+} 
+
+/************************************************************************************************
+* Member Function: plotSliderPos()
+* Purpose: Plot slider position with respect to time
+* Arguments:  &plot --- Pointer to a CPlot class variable for formatting the plot of the branch
+*                       to be drawn
+************************************************************************************************/
+
+void CMechanism::plotSliderPos(class CPlot *plot)
+{
+    int i;
+    double theta2[m_numpoints], t[m_numpoints];
+    double r6_1[m_numpoints];
+    double theta_1[1:6], theta_2[1:6], theta5[1:4], r6[1:4];
+    
+    theta_1[1] = m_theta[1];
+    theta_2[1] = m_theta[1];
+    
+    linspace(theta2, 0, 2*M_PI);
+    
+    for(i=0; i< m_numpoints;i++)
+    {
+        theta_1[2] = theta2[i];
+        theta_2[2] = theta2[i];
+        t[i] = i;
+        position(theta_1, theta_2);
+        sliderPos(theta_1, theta_2, r6, theta5);
+        r6_1[i] = r6[1];
+    }
+    
+    plot->data2D(t,r6_1);
+    plot->title("Slider Position Plot");
+    plot->label(PLOT_AXIS_X, "Time (sec)"); 
+    plot->label(PLOT_AXIS_Y, "Slider Position (m)"); 
+    plot->border(PLOT_BORDER_ALL, PLOT_ON);
+    plot->plotting();
+}
+
+/************************************************************************************************
+* Member Function: plotSliderVel()
+* Purpose: Plot slider velocity with respect to time
+* Arguments: &plot --- Pointer to a CPlot class variable for formatting the plot of the branch
+*                       to be drawn
+************************************************************************************************/
+void CMechanism::plotSliderVel(class CPlot *plot)
+{
+    int i;
+    double theta2[m_numpoints], t[m_numpoints];
+    double V6[m_numpoints];
+    double theta_1[1:6], theta_2[1:6],omega[1:5],theta5[1:4],r6[1:4],
+            v6_x, v6_y, v6;
+    
+    theta_1[1] = m_theta[1];
+    theta_2[1] = m_theta[1];
+    omega[2] = m_omega[2];
+    
+    linspace(theta2, 0, 2*M_PI);
+    
+    for(i =0; i< m_numpoints;i++)
+    {
+        theta_1[2] = theta2[i];
+        theta_2[2] = theta2[i];
+        t[i] = i;
+        position(theta_1, theta_2);
+        velocity(theta_1, omega);
+        sliderPos(theta_1, theta_2, r6, theta5);
+        sliderVel(theta_1, omega, v6_x, v6_y, v6);
+        V6[i] = v6;
+    }
+ 
+    plot->data2D(t, V6);
+    plot->title("Slider Velocity Plot");
+    plot->label(PLOT_AXIS_X, "time (sec)"); 
+    plot->label(PLOT_AXIS_Y, "Slider Velocity (m/s)"); 
+    plot->border(PLOT_BORDER_ALL, PLOT_ON);
+    plot->plotting();
+}
+
+/************************************************************************************************
+* Member Function: animation()
+* Purpose: Animation of a fourbar-slider mechanism
+* Arguments:  No arguments
+************************************************************************************************/
+int CMechanism::animation(void)
+{
+    int i, numpoints = 361;
+    double theta_1[1:6], theta_2[1:6];
+    double r6[1:4], theta5[1:4], theta2;
+    double complex L[1:7], p1, p2;
+    
+    double theta3[numpoints], theta4[numpoints],r6_1[numpoints];
+    double complex P[numpoints];
+
+    double sliderHeight;
+    double sliderWidth;
+    FILE *fp;
+    
+    theta_1[1] = m_theta[1];
+    theta_2[1] = m_theta[1];
+    sliderWidth = 0.5;
+    sliderHeight = sliderWidth /2;
+    L[1] = polar(m_r[1], theta_1[1]);
+    
+    for(i = 0; i < numpoints; i++)
+    {
+        theta_1[2] = deg2rad(i);
+        theta_2[2] = theta_1[2];
+        
+        // Calculate positions
+        position(theta_1, theta_2);
+        couplerPos(theta_1[2], p1, p2);
+        sliderPos(theta_1, theta_2, r6, theta5);
+        
+        theta3[i] = theta_1[3];
+        theta4[i] = theta_1[4];
+        P[i] = p1;
+        r6_1[i] = r6[1];
+    }
+    
+    fp = fopen("sliderAni.qnm", "w");
+    if (fp == NULL) {
+        printf("Could not open animation file.\n");
+        exit(1);
+    }
+    
+    fprintf(fp, "title \"Slider Mechanism\"\n");
+    fprintf(fp, "fixture\n");
+    fprintf(fp, "groundpin 0 0\n");
+    fprintf(fp, "groundpin %lf %lf\\\n", real(L[1]), imag(L[1]));
+    fprintf(fp, "ground %lf %lf %lf %lf\n",
+            min(r6_1) - sliderWidth / 2, -sliderHeight / 2, max(r6_1) + 
+                sliderWidth / 2, -sliderHeight / 2);
+    fprintf(fp, "animate restart\n\n");
+    
+    for (i = 0; i < numpoints; i++) {
+        fprintf(fp, "# frame %d\n", i);
+        L[1] = complex(0, 0);
+        L[2] = polar(m_r[2], deg2rad((double)(i)));
+        L[3] = L[2] + polar(m_r[3], theta3[i]);
+        L[4] = L[3] - polar(m_r[4], theta4[i]);
+        L[5] = L[4] + polar(m_r[7], theta4[i]); // r4'
+        L[6] = complex(r6_1[i], 0);
+        L[7] = P[i];
+        fprintf(fp, "link 0 0 %lf %lf %lf %lf %lf %lf\\\n",
+                real(L[2]), imag(L[2]),
+                real(L[3]), imag(L[3]),
+                real(L[4]), imag(L[4]));
+        fprintf(fp, "link %lf %lf %lf %lf\\\n",
+                real(L[5]), imag(L[5]),
+                real(L[6]), imag(L[6]));
+        fprintf(fp, "rectangle %lf %lf %lf %lf\\\n",
+                real(L[6]) - sliderWidth / 2, imag(L[6]) - sliderHeight / 2, 
+                    sliderWidth, sliderHeight);
+        fprintf(fp, "polygon fill gray90 %lf %lf %lf %lf %lf %lf\\\n",
+                real(L[2]), imag(L[2]),
+                real(L[3]), imag(L[3]),
+                real(L[7]), imag(L[7]));
+        //fprintf(fp, "point trace %lf %lf\\\n", real(L[7]), imag(L[7])); Uncomment to trace coupler point
+        fprintf(fp, "\n");
+    }
+    fclose(fp);
+    qanimate sliderAni.qnm 
+        
+    return 0;
+}
+/**************************************************************************************************
+* Member Function: setGravityCenter()
+* Purpose: Set parameters for mass centers of links.
+* Arguments:    rg[1:] --- double array used for distance from joint to center of 
+*                          gravity for corresponding link number
+*            delta[1:] --- double array used for angle between the corresponding rg vector and link
+***************************************************************************************************/
+void CMechanism::setGravityCenter(double rg[1:], delta[1:]) {
+    
+    m_rg[2] = rg[2];
+    m_rg[3] = rg[3];
+    m_rg[4] = rg[4];
+    m_rg[5] = rg[5];
+    m_rg[6] = rg[6];
+    
+    m_delta[2] = delta[2];
+    m_delta[3] = delta[3];
+    m_delta[4] = delta[4];
+    m_delta[5] = delta[5];
+    m_delta[6] = delta[6];
+    
+    if(m_uscunit) {
+        m_rg[2] *= M_FT2M;      // ft to m
+        m_rg[3] *= M_FT2M;
+        m_rg[4] *= M_FT2M;
+        m_rg[5] *= M_FT2M;
+        m_rg[6] *= M_FT2M;
+    }
+}
+
+/**************************************************************************************************
+* Member Function: setInertia()
+* Purpose: Set inertia parameters of the links.
+* Arguments: ig[1:] --- double array used for inertia of corresponding link 
+***************************************************************************************************/
+void CMechanism::setInertia(double ig[1:]) {
+    m_inertia[2] = ig[2];
+    m_inertia[3] = ig[3];
+    m_inertia[4] = ig[4];
+    m_inertia[5] = ig[5];
+    m_inertia[6] = ig[6];
+
+    if(m_uscunit) {
+        m_inertia[2] *= M_LBFTSS2KGMM;     // lb-ft-s^2 to kg-m^2  
+        m_inertia[3] *= M_LBFTSS2KGMM;      
+        m_inertia[4] *= M_LBFTSS2KGMM;
+        m_inertia[5] *= M_LBFTSS2KGMM;      
+        m_inertia[6] *= M_LBFTSS2KGMM;         
+    }
+}
+
+/**************************************************************************************************
+* Member Function: setMass()
+* Purpose: Set masses of the links.
+* Arguments: m[1:] --- double array used for mass of corresponding link 
+***************************************************************************************************/
+void CMechanism::setMass(double m[1:]) {
+    m_mass[2] = m[2];
+    m_mass[3] = m[3];
+    m_mass[4] = m[4];
+    m_mass[5] = m[5];
+    m_mass[6] = m[6];
+
+    if(m_uscunit) {
+        m_mass[2] *= M_SLUG2KG;     // slug to kg 
+        m_mass[3] *= M_SLUG2KG;     
+        m_mass[4] *= M_SLUG2KG;     
+        m_mass[5] *= M_SLUG2KG;     
+        m_mass[6] *= M_SLUG2KG;  
+    }    
+}
+
+/*********************************************************************************************
+* Member Function: forceTorque()
+* Purpose: Calculate the required torque to produce a given output force at a given point.
+* Arguments: theta --- double array used for the angles of links
+*            omega --- double array used for the angular velocities of links
+*            alpha --- double array used for the angular accelerations of links
+*               Fl --- double number used for the Force load
+*               as --- double number used for real part of slider acceleration
+*               ts --- double number used for the input torque
+*********************************************************************************************/
+void CMechanism::forceTorque(double theta[1:], omega[1:], alpha[1:], a6, Fl, &ts) {
+    array double B[1:14], A[1:14][1:14], x[1:14];
+    double g = 9.81;    // m/s^2 
+    double complex ag[1:6];
+    double fg_x[6], fg_y[6], tg[5];
+
+    if(m_uscunit) {
+        Fl *= M_LB2N;     // lb to N 
+        a6 *= M_FT2M;     // ft/s^2 to m/s^2
+    }
+    
+    // acceleration at the mass center
+    ag[2] = I*polar(m_rg[2]*alpha[2],theta[2]+m_delta[2])
+        -polar(m_rg[2]*omega[2]*omega[2],theta[2]+m_delta[2]);
+    ag[3] = I*polar(m_r[2]*alpha[2],theta[2])-polar(m_r[2]*omega[2]*omega[2],theta[2]) 
+        + I*polar(m_rg[3]*alpha[3],theta[3]+m_delta[3])
+        - polar(m_rg[3]*omega[3]*omega[3],theta[3]+m_delta[3]);
+    ag[4] = I*polar(m_rg[4]*alpha[4],theta[4]+m_delta[4])
+        -polar(m_rg[4]*omega[4]*omega[4],theta[4]+m_delta[4]);
+    ag[5] = I*polar(m_rg[5]*alpha[5],theta[5])
+        -polar(m_rg[5]*omega[5]*omega[5],theta[5]);
+    ag[6] = 0;
+    
+    // inertial force and torque for each links
+    fg_x[2] = -m_mass[2]*real(ag[2]);
+    fg_y[2] = -m_mass[2]*imag(ag[2]);
+    tg[2] = -m_inertia[2]*alpha[2];
+    fg_x[3] = -m_mass[3]*real(ag[3]);
+    fg_y[3] = -m_mass[3]*imag(ag[3]);
+    tg[3] = -m_inertia[3]*alpha[3];
+    fg_x[4] = -m_mass[4]*real(ag[4]);
+    fg_y[4] = -m_mass[4]*imag(ag[4]);
+    tg[4] = -m_inertia[4]*alpha[4];
+    fg_x[5] = -m_mass[5]*real(ag[5]);
+    fg_y[5] = -m_mass[5]*imag(ag[5]);
+    tg[5] = -m_inertia[5]*alpha[5];
+    fg_x[6] = m_mass[6]*a6;
+
+    // matrix B
+    B[1] = fg_x[2];
+    B[2] = fg_y[2] - m_mass[2]*g;
+    B[3] = tg[2];
+    B[4] = fg_x[3];
+    B[5] = fg_y[3] - m_mass[3]*g;
+    B[6] = tg[3];
+    B[7] = fg_x[4];
+    B[8] = fg_y[4] - m_mass[4]*g;
+    B[9] = tg[4];
+    B[10] = fg_x[5];
+    B[11] = fg_y[5] - m_mass[5]*g;
+    B[12] = tg[5];
+    B[13] = fg_x[6] + Fl;
+    B[14] = fg_y[6] - m_mass[6]*g;
+    
+    // matrix A
+    A[1][1] = -1;
+    A[1][3] = 1;
+    A[2][2] = -1;
+    A[2][4] = 1;
+    A[3][1] = m_rg[2]*sin(M_PI/2-theta[2]-m_delta[2]);
+    A[3][2] = -m_rg[2]*cos(theta[2]+m_delta[2]);
+    A[3][3] = m_r[2]*sin(theta[2])-m_rg[2]*sin(theta[2]+m_delta[2]);
+    A[3][4] = m_r[2]*cos(theta[2])-m_rg[2]*cos(theta[2]+m_delta[2]);
+    A[3][14] = -1;
+    A[4][3] = -1;
+    A[4][5] = 1;
+    A[5][4] = -1;
+    A[5][6] = 1;
+    A[6][3] = m_rg[3]*sin(theta[3]+m_delta[3]);
+    A[6][4] = -m_rg[3]*cos(theta[3]+m_delta[3]);
+    A[6][5] = m_r[3]*sin(theta[3])-m_rg[3]*sin(theta[3]+m_delta[3]);
+    A[6][6] = m_r[3]*cos(theta[3])-m_rg[3]*cos(theta[3]+m_delta[3]);
+    A[7][5] = -1;
+    A[7][7] = 1;
+    A[7][11] = 1;
+    A[8][6] = -1;
+    A[8][8] = 1;
+    A[8][12] = -1;
+    A[9][5] = -(m_r[4]*sin(M_PI-theta[4])-m_rg[4]*sin(M_PI-theta[4]-m_delta[4]));
+    A[9][6] = -m_r[4]*cos(M_PI-theta[4])+m_rg[4]*cos(M_PI-theta[4]-m_delta[4]);
+    A[9][7] = m_r[7]*sin(M_PI-theta[4]);
+    A[9][8] = m_r[7]*cos(M_PI-theta[4]);
+    A[9][11] = m_rg[4]*sin(M_PI-theta[4]-m_delta[4]);
+    A[9][12] = m_rg[4]*cos(M_PI-theta[4]-m_delta[4]);
+    A[10][7] = -1;
+    A[10][9] = 1;
+    A[11][8] = -1;
+    A[11][10] = 1;
+    A[12][7] = -(m_r[5]-m_rg[5])*sin(M_PI-theta[5]);
+    A[12][8] = -(m_r[5]-m_rg[5])*cos(M_PI-theta[5]);
+    A[12][9] = -(m_rg[5]*sin(M_PI-theta[5]));
+    A[12][10] = -(m_rg[5]*cos(M_PI-theta[5]));
+    A[13][9] = 1;
+    A[14][10] = -1;
+    A[14][13] = -1;
+    
+    // solve linear system of equations
+    x = inverse(A)*B;
+    
+    // convert units
+    if(m_uscunit) {
+        x[1] /= M_LB2N;    // N to lb 
+        x[2] /= M_LB2N;    
+        x[3] /= M_LB2N;    
+        x[4] /= M_LB2N;    
+        x[5] /= M_LB2N;    
+        x[6] /= M_LB2N;    
+        x[7] /= M_LB2N;     
+        x[8] /= M_LB2N;
+        x[9] /= M_LB2N;    
+        x[10] /= M_LB2N;    
+        x[11] /= M_LB2N;    
+        x[12] /= M_LB2N;    
+        x[13] /= M_LB2N;    
+        x[14] /= M_LBFT2NM; // N-m to lb-ft   
+    }
+    
+    ts = x[14];
+}
+
